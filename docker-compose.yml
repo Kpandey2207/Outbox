@@ -1,0 +1,97 @@
+# Full stack: create backend/.env first (see "Quick start" in the README: it needs a real
+# JWT_SECRET, because this stack runs in production mode), then `docker compose up --build`
+# and open http://localhost:3000.
+# For local development you can run only the infrastructure:
+#   docker compose up -d postgres redis elasticsearch
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: outbox
+      POSTGRES_PASSWORD: outbox
+      POSTGRES_DB: outbox
+    # Published on localhost only: the default credentials are for local use.
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U outbox"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    # AOF with fsync every second: delayed jobs survive a Redis restart, losing at most ~1s
+    # of writes. Anything lost is re-created from Postgres by the worker on boot.
+    # noeviction is required by BullMQ; evicting job keys would silently drop emails.
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory-policy", "noeviction"]
+    ports: ["127.0.0.1:6379:6379"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports: ["127.0.0.1:9200:9200"]
+    volumes: [esdata:/usr/share/elasticsearch/data]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      retries: 20
+
+  api:
+    build: ./backend
+    # API_URL, FRONTEND_URL, COOKIE_SECURE and QUEUE_ADMIN_EMAILS come from backend/.env, so
+    # the stack also works behind a tunnel (ngrok) for Google and Slack OAuth.
+    env_file: ./backend/.env
+    environment: &backend-env
+      NODE_ENV: production
+      DATABASE_URL: postgres://outbox:outbox@postgres:5432/outbox
+      REDIS_URL: redis://redis:6379
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      DEV_LOGIN_ENABLED: "false"
+    ports: ["127.0.0.1:4000:4000"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 10s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      # Search is optional (Postgres fallback), so a slow or failed Elasticsearch never
+      # keeps the API from starting.
+      elasticsearch: { condition: service_started }
+
+  worker:
+    build: ./backend
+    command: ["node", "dist/worker.js"]
+    env_file: ./backend/.env
+    environment: *backend-env
+    # Two worker processes, to show each email is still sent once across processes.
+    deploy: { replicas: 2 }
+    stop_grace_period: 60s
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  web:
+    build:
+      context: ./frontend
+      args: { API_ORIGIN: http://api:4000 }
+    ports: ["3000:3000"]
+    restart: unless-stopped
+    depends_on:
+      api: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  redisdata:
+  esdata:

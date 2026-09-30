@@ -1,0 +1,83 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource/pixelify-sans/700.css";
+
+/* Design tokens, taken from the Outbox dashboard design. */
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --font-logo: "Pixelify Sans", ui-monospace, monospace;
+
+  --color-brand-50: #e9f6ec;
+  --color-brand-100: #d4eedb;
+  --color-brand-500: #00a63e;
+  --color-brand-600: #008f35;
+  --color-brand-700: #0b6b2e;
+
+  --color-ink: #111111;
+  --color-ink-muted: #5f5f5f;
+  --color-ink-subtle: #9a9a9a;
+  --color-line: #ececec;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f4f5f4;
+
+  --color-scheduled-bg: #fde6d2;
+  --color-scheduled-fg: #b4541a;
+  --color-sent-bg: #eeeeee;
+  --color-sent-fg: #555555;
+  --color-failed-bg: #fdecec;
+  --color-failed-fg: #c0392b;
+}
+
+html,
+body {
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+.rich-text ul { list-style: disc; padding-left: 1.25rem; }
+.rich-text ol { list-style: decimal; padding-left: 1.25rem; }
+.rich-text a { color: var(--color-brand-600); text-decoration: underline; }
+.rich-text p { margin: 0 0 0.5rem; }
+.rich-text blockquote { border-left: 3px solid var(--color-line); padding-left: 0.75rem; color: var(--color-ink-muted); }
+
+/* ---- Motion ------------------------------------------------------------------ */
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop-in { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+
+.animate-fade-in { animation: fade-in 150ms ease-out; }
+.animate-pop-in { animation: pop-in 140ms ease-out; transform-origin: top; }
+.animate-sheet-up { animation: sheet-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.animate-toast-in { animation: toast-in 180ms ease-out; }
+.skeleton {
+  background: linear-gradient(90deg, var(--color-surface-muted) 0%, var(--color-line) 50%, var(--color-surface-muted) 100%);
+  background-size: 800px 100%;
+  animation: shimmer 1.2s linear infinite;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+}
+
+/* ---- Phones ------------------------------------------------------------------ */
+@media (max-width: 767px) {
+  /* iOS zooms into any field under 16px on focus, which breaks the layout. */
+  input, select, textarea, [contenteditable="true"] { font-size: 16px !important; }
+}
+
+/* Room for the iPhone home indicator under fixed bottom bars. */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+
+/* Thin horizontal scroller, for the editor toolbar on phones. */
+.scroll-x { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.scroll-x::-webkit-scrollbar { display: none; }
+
+button, a { -webkit-tap-highlight-color: transparent; }
